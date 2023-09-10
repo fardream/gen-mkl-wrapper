@@ -1,0 +1,47 @@
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+#![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
+#![allow(clippy::too_many_arguments)]
+
+/* Generated for following funcs
+{{range .DesiredFuncList}}{{.}}
+{{end}}*/
+
+use {{.UseLine}};
+
+pub trait {{.TraitName}} {
+{{- range .TraitFuncs}}
+    fn {{.BetterName}}(
+    {{range .Params}}    {{.}},
+    {{end}}){{.ReturnDeclare}};
+{{end -}}
+}
+
+impl {{.TraitName}} for f64 {
+{{- range .F64Funcs}}
+    fn {{.BetterName}}(
+    {{range .Params}}    {{.}},
+    {{end}}) {{.ReturnDeclare}}{
+        unsafe {
+            {{.RawName}}(
+            {{range .CallParams}}    {{.}},
+            {{end}})
+        }
+    }
+{{end -}}
+}
+
+impl {{.TraitName}} for f32 {
+{{- range .F32Funcs}}
+    fn {{.BetterName}}(
+    {{range .Params}}    {{.}},
+    {{end}}) {{.ReturnDeclare}}{
+        unsafe {
+            {{.RawName}}(
+            {{range .CallParams}}    {{.}},
+            {{end}})
+        }
+    }
+{{end -}}
+}
