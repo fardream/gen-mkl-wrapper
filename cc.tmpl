@@ -1,0 +1,17 @@
+#include <mkl.h>
+
+/* Generated for following funcs
+{{range .DesiredFuncList}}{{.}}
+{{end}}*/
+
+{{range .F64Funcs}}
+inline {{.ReturnType}} {{.BetterName}}({{.CParams}}) {
+    return {{.RawName}}({{.CInput}});
+}
+{{end -}}
+
+{{- range .F32Funcs}}
+inline {{.ReturnType}} {{.BetterName}}({{.CParams}}) {
+    return {{.RawName}}({{.CInput}});
+}
+{{end -}}
