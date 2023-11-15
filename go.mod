@@ -4,7 +4,7 @@ go 1.21.1
 
 require (
 	github.com/spf13/cobra v1.8.0
-	modernc.org/cc/v4 v4.14.12
+	modernc.org/cc/v4 v4.15.0
 )
 
 require (
