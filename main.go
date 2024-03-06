@@ -52,6 +52,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"modernc.org/cc/v4"
+	"mvdan.cc/gofumpt/format"
 )
 
 //go:embed rs.tmpl
@@ -60,6 +61,9 @@ var rsTmplText string
 //go:embed cc.tmpl
 var ccTmplText string
 
+//go:embed go.tmpl
+var goTmplText string
+
 var (
 	mklPath          = ""
 	inputFuncsPath   = ""
@@ -67,14 +71,23 @@ var (
 	mklProviderCrate = "crate"
 	traitName        = "MKLRoutines"
 	forC             = false
+	forGo            = false
+	goPackageName    = "mklroutines"
 )
 
 type funcArg struct {
 	name     string
 	typeName string
+	// rustName is the rust type name
 	rustName string
-	dontUse  bool
+	// dontUse indicates if the type should be imported from crate, for rust
+	dontUse bool
+	// cgoType is the cgoType that is the input to the code
+	cgoType string
+	// goType
+	goType string
 }
+
 type funcDef struct {
 	RawName    string
 	is32       bool
@@ -83,14 +96,26 @@ type funcDef struct {
 	BetterName string
 }
 
-type tmpInput struct {
+func (f *funcDef) GoName() string {
+	name := []byte(f.BetterName)
+	if name[0] >= 'a' && name[0] <= 'z' {
+		name[0] = 'A' + (name[0] - 'a')
+	}
+	return string(name)
+}
+
+type tmplInput struct {
 	funcDefs        []funcDef
 	providerCrate   string
 	DesiredFuncList []string
 }
 
-func (*tmpInput) TraitName() string {
+func (*tmplInput) TraitName() string {
 	return traitName
+}
+
+func (*tmplInput) GoPackageName() string {
+	return goPackageName
 }
 
 func (f *funcDef) CParams() string {
@@ -116,7 +141,7 @@ func (f *funcDef) CInput() string {
 	return strings.Join(ps, ",")
 }
 
-func (i *tmpInput) UseLine() string {
+func (i *tmplInput) UseLine() string {
 	uses := make([]string, 0, len(i.funcDefs)+3)
 
 	blastypes := make(map[string]struct{})
@@ -139,7 +164,79 @@ func (i *tmpInput) UseLine() string {
 	return fmt.Sprintf("%s::{%s}", i.providerCrate, strings.Join(uses, ", "))
 }
 
-func (i *tmpInput) getfuncs(is32 bool) []*funcDef {
+type GoFuncPair struct {
+	Float64Func *funcDef
+	Float32Func *funcDef
+	Name        string
+}
+
+func (i *tmplInput) GoFuncs() []*GoFuncPair {
+	f32funcs := i.F32Funcs()
+	result := make([]*GoFuncPair, 0, len(f32funcs))
+	byname := make(map[string]*GoFuncPair)
+
+	for _, f32func := range f32funcs {
+		f := &GoFuncPair{
+			Float32Func: f32func,
+			Name:        f32func.GoName(),
+		}
+		result = append(result, f)
+		byname[f.Name] = f
+	}
+
+	for _, f64func := range i.F64Funcs() {
+		f, ok := byname[f64func.GoName()]
+		if !ok {
+			panic(fmt.Sprintf("f64 has name %s", f64func.GoName()))
+		}
+		f.Float64Func = f64func
+	}
+
+	return result
+}
+
+func getGoParamType(t string) string {
+	switch t {
+	case "size_t":
+		return "uint64"
+	case "int32_t", "int", "const int", "const int32_t":
+		return "int32"
+	case "int64_t":
+		return "int64"
+	case "const double *", "const float *", "const float[]", "const double[]":
+		return "*F"
+	case "double *", "float *", "float[]", "double[]":
+		return "*F"
+	case "double", "float", "const double", "const float":
+		return "F"
+	case "char":
+		return "byte"
+	case "int *":
+		return "*int32"
+	case "const int *":
+		return "*int32"
+	case "CBLAS_LAYOUT", "CBLAS_UPLO", "CBLAS_DIAG", "CBLAS_TRANSPOSE", "CBLAS_SIDE":
+		return t
+	}
+
+	if strings.HasPrefix(t, "const ") {
+		t = strings.TrimPrefix(t, "const ")
+	}
+
+	return fmt.Sprintf("C.%s", t)
+}
+
+func (f *GoFuncPair) Params() []string {
+	r := []string{}
+	for _, p := range f.Float32Func.args {
+		t := getGoParamType(p.typeName)
+		r = append(r, fmt.Sprintf("%s %s", p.name, t))
+	}
+
+	return r
+}
+
+func (i *tmplInput) getfuncs(is32 bool) []*funcDef {
 	r := []*funcDef{}
 	for _, f := range i.funcDefs {
 		f := f
@@ -151,16 +248,31 @@ func (i *tmpInput) getfuncs(is32 bool) []*funcDef {
 	return r
 }
 
-func (i *tmpInput) F64Funcs() []*funcDef {
+func (i *tmplInput) F64Funcs() []*funcDef {
 	return i.getfuncs(false)
 }
 
-func (i *tmpInput) F32Funcs() []*funcDef {
+func (i *tmplInput) F32Funcs() []*funcDef {
 	return i.getfuncs(true)
 }
 
-func (i *tmpInput) TraitFuncs() []*funcDef {
+func (i *tmplInput) TraitFuncs() []*funcDef {
 	return i.getfuncs(true)
+}
+
+func (f *GoFuncPair) GoReturn() string {
+	switch f.Float32Func.ReturnType {
+	case "void":
+		return ""
+	case "int32_t", "int":
+		return "int32"
+	case "float", "double":
+		return "F"
+	case "size_t":
+		return "uint64"
+	default:
+		return f.Float32Func.ReturnType
+	}
 }
 
 func (f *funcDef) ReturnDeclare() string {
@@ -392,17 +504,27 @@ func run(cmd *cobra.Command, args []string) {
 	}
 	var b bytes.Buffer
 
-	if forC {
+	switch {
+	case forC:
 		ccTmpl := getOrPanic(template.New("cc-tmpl").Parse(ccTmplText))
-		orPanic(ccTmpl.Execute(&b, &tmpInput{
+		orPanic(ccTmpl.Execute(&b, &tmplInput{
 			funcDefs:        funcs,
 			providerCrate:   mklProviderCrate,
 			DesiredFuncList: flist.desiredFuncList,
 		}))
-	} else {
+	case forGo:
+		goTmpl := getOrPanic(template.New("go-tmpl").Parse(goTmplText))
+		orPanic(goTmpl.Execute(&b, &tmplInput{
+			funcDefs:        funcs,
+			providerCrate:   mklProviderCrate,
+			DesiredFuncList: flist.desiredFuncList,
+		}))
+		newb := getOrPanic(format.Source(b.Bytes(), format.Options{LangVersion: "1.22"}))
+		b.Reset()
+		getOrPanic(b.Write(newb))
+	default:
 		rsTmpl := getOrPanic(template.New("rs-tmpl").Parse(rsTmplText))
-
-		orPanic(rsTmpl.Execute(&b, &tmpInput{
+		orPanic(rsTmpl.Execute(&b, &tmplInput{
 			funcDefs:        funcs,
 			providerCrate:   mklProviderCrate,
 			DesiredFuncList: flist.desiredFuncList,
@@ -412,7 +534,7 @@ func run(cmd *cobra.Command, args []string) {
 	orPanic(os.WriteFile(outputFile, b.Bytes(), 0o666))
 }
 
-var longDescription = `generate select mkl bindings for rust or c++.
+var longDescription = `generate select mkl bindings for rust, c++, or go.
 
 Use - for stdin, for example
 
@@ -436,7 +558,7 @@ Add the generated bindings to the root mod of the crate to use default option "c
 
 func main() {
 	cmd := &cobra.Command{
-		Short: "generate select bindings of MKL for rust or c++",
+		Short: "generate select bindings of MKL for rust, c++, or go",
 		Use:   "gen-mkl-wrapper",
 		Args:  cobra.NoArgs,
 		Long:  longDescription,
@@ -447,7 +569,7 @@ func main() {
 	cmd.MarkFlagRequired("input")
 
 	cmd.Flags().StringVarP(&outputFile, "output", "o", outputFile, "output file")
-	cmd.MarkFlagFilename("output", "rs", "h")
+	cmd.MarkFlagFilename("output", "rs", "h", "go")
 	cmd.MarkFlagRequired("output")
 
 	cmd.Flags().StringVarP(&mklPath, "mkl-header", "m", mklPath, "path to mkl.h file")
@@ -457,6 +579,10 @@ func main() {
 	cmd.Flags().StringVarP(&traitName, "trait-name", "t", traitName, "trait name")
 
 	cmd.Flags().BoolVar(&forC, "for-cc", forC, "output c++")
+
+	cmd.Flags().BoolVar(&forGo, "for-go", forGo, "output go")
+	cmd.Flags().StringVar(&goPackageName, "gopkg", goPackageName, "go package name")
+
 	cmd.Run = run
 	cmd.Execute()
 }
