@@ -1,17 +1,26 @@
+#ifndef {{.CMacroDefines}}
+#define {{.CMacroDefines}}
 #include <mkl.h>
+
 
 /* Generated for following funcs
 {{range .DesiredFuncList}}{{.}}
 {{end}}*/
 
+#ifdef __cplusplus
+
 {{range .F64Funcs}}
 inline {{.ReturnType}} {{.BetterName}}({{.CParams}}) {
-    return {{.RawName}}({{.CInput}});
+    {{if .HasReturn}}return {{end}}{{.RawName}}({{.CInput}});
 }
 {{end -}}
 
 {{- range .F32Funcs}}
 inline {{.ReturnType}} {{.BetterName}}({{.CParams}}) {
-    return {{.RawName}}({{.CInput}});
+    {{if .HasReturn}}return {{end}}{{.RawName}}({{.CInput}});
 }
 {{end -}}
+
+#endif // C++
+
+#endif // {{.CMacroDefines}}
