@@ -73,6 +73,7 @@ var (
 	forC             = false
 	forGo            = false
 	goPackageName    = "mklroutines"
+	cMacroDefines    = "MKL_ROUNTINES_WARPPERS_H_"
 )
 
 type funcArg struct {
@@ -96,6 +97,10 @@ type funcDef struct {
 	BetterName string
 }
 
+func (f *funcDef) HasReturn() bool {
+	return f.ReturnType != "void"
+}
+
 func (f *funcDef) GoName() string {
 	name := []byte(f.BetterName)
 	if name[0] >= 'a' && name[0] <= 'z' {
@@ -116,6 +121,10 @@ func (*tmplInput) TraitName() string {
 
 func (*tmplInput) GoPackageName() string {
 	return goPackageName
+}
+
+func (*tmplInput) CMacroDefines() string {
+	return cMacroDefines
 }
 
 func (f *funcDef) CParams() string {
@@ -582,6 +591,8 @@ func main() {
 
 	cmd.Flags().BoolVar(&forGo, "for-go", forGo, "output go")
 	cmd.Flags().StringVar(&goPackageName, "gopkg", goPackageName, "go package name")
+
+	cmd.Flags().StringVar(&cMacroDefines, "c-macro-defines", cMacroDefines, "c macro defines for header")
 
 	cmd.Run = run
 	cmd.Execute()
