@@ -4,7 +4,7 @@ go 1.21.1
 
 require (
 	github.com/spf13/cobra v1.8.1
-	modernc.org/cc/v4 v4.21.3
+	modernc.org/cc/v4 v4.21.4
 	mvdan.cc/gofumpt v0.6.0
 )
 
