@@ -113,6 +113,7 @@ type tmplInput struct {
 	funcDefs        []funcDef
 	providerCrate   string
 	DesiredFuncList []string
+	Includes        []string
 }
 
 func (*tmplInput) TraitName() string {
@@ -349,12 +350,29 @@ func (f *funcDef) CallParams() []string {
 	return r
 }
 
+func retrieveTypeSpecifier(r *cc.TypeSpecifier) (typename string) {
+	switch r.Case {
+	case cc.TypeSpecifierEnum:
+		enumspec := r.EnumSpecifier
+		switch enumspec.Case {
+		case cc.EnumSpecifierTag:
+			return enumspec.Token2.SrcStr()
+		default:
+			return enumspec.Token.SrcStr()
+		}
+	default:
+		return r.Token.SrcStr()
+	}
+}
+
 func retrieveType(r *cc.DeclarationSpecifiers) string {
 	switch r.Case {
 	case cc.DeclarationSpecifiersTypeQual:
 		return r.TypeQualifier.Token.SrcStr() + " " + retrieveType(r.DeclarationSpecifiers)
+
 	case cc.DeclarationSpecifiersTypeSpec:
-		return r.TypeSpecifier.Token.SrcStr()
+		return retrieveTypeSpecifier(r.TypeSpecifier)
+
 	case cc.DeclarationSpecifiersAlignSpec:
 		fallthrough
 	case cc.DeclarationSpecifiersFunc:
@@ -405,6 +423,10 @@ func retrieveParams(r *cc.ParameterList, i int) []funcArg {
 		if paramName == "" {
 			paramName = fmt.Sprintf("p%d", i)
 		}
+		if typeName == "" {
+			panic(fmt.Sprintf("failed param type: %s", paramdecl.String()))
+		}
+
 		rustname, dontUse := getRustParamType(typeName)
 		return append([]funcArg{{
 			name:     paramName,
@@ -565,6 +587,8 @@ For example, if the generated bindings are in the same crate but under mod mkl_c
 Add the generated bindings to the root mod of the crate to use default option "crate".
 `
 
+var includes []string
+
 func main() {
 	cmd := &cobra.Command{
 		Short: "generate select bindings of MKL for rust, c++, or go",
@@ -573,7 +597,8 @@ func main() {
 		Long:  longDescription,
 	}
 
-	cmd.Flags().StringVarP(&inputFuncsPath, "input", "i", inputFuncsPath, "list of functions to generate. use * for s/d, use # for S/D. use - for stdin.")
+	cmd.Flags().StringVarP(&inputFuncsPath, "input", "i", inputFuncsPath,
+		"list of functions to generate. use * for s/d, use # for S/D. use - for stdin.")
 	cmd.MarkFlagFilename("input")
 	cmd.MarkFlagRequired("input")
 
@@ -593,6 +618,8 @@ func main() {
 	cmd.Flags().StringVar(&goPackageName, "gopkg", goPackageName, "go package name")
 
 	cmd.Flags().StringVar(&cMacroDefines, "c-macro-defines", cMacroDefines, "c macro defines for header")
+
+	cmd.Flags().StringSliceVar(&includes, "include", includes, "headers to put in cc include")
 
 	cmd.Run = run
 	cmd.Execute()

@@ -1,7 +1,11 @@
 #ifndef {{.CMacroDefines}}
 #define {{.CMacroDefines}}
-#include <mkl.h>
 
+{{range .Includes}}
+#include <{{.}}>
+{{else}}
+#include <mkl.h>
+{{end}}
 
 /* Generated for following funcs
 {{range .DesiredFuncList}}{{.}}
