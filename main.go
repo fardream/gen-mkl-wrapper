@@ -535,31 +535,25 @@ func run(cmd *cobra.Command, args []string) {
 	}
 	var b bytes.Buffer
 
+	tmplInput := &tmplInput{
+		funcDefs:        funcs,
+		providerCrate:   mklProviderCrate,
+		DesiredFuncList: flist.desiredFuncList,
+		Includes:        includes,
+	}
 	switch {
 	case forC:
 		ccTmpl := getOrPanic(template.New("cc-tmpl").Parse(ccTmplText))
-		orPanic(ccTmpl.Execute(&b, &tmplInput{
-			funcDefs:        funcs,
-			providerCrate:   mklProviderCrate,
-			DesiredFuncList: flist.desiredFuncList,
-		}))
+		orPanic(ccTmpl.Execute(&b, tmplInput))
 	case forGo:
 		goTmpl := getOrPanic(template.New("go-tmpl").Parse(goTmplText))
-		orPanic(goTmpl.Execute(&b, &tmplInput{
-			funcDefs:        funcs,
-			providerCrate:   mklProviderCrate,
-			DesiredFuncList: flist.desiredFuncList,
-		}))
+		orPanic(goTmpl.Execute(&b, tmplInput))
 		newb := getOrPanic(format.Source(b.Bytes(), format.Options{LangVersion: "1.22"}))
 		b.Reset()
 		getOrPanic(b.Write(newb))
 	default:
 		rsTmpl := getOrPanic(template.New("rs-tmpl").Parse(rsTmplText))
-		orPanic(rsTmpl.Execute(&b, &tmplInput{
-			funcDefs:        funcs,
-			providerCrate:   mklProviderCrate,
-			DesiredFuncList: flist.desiredFuncList,
-		}))
+		orPanic(rsTmpl.Execute(&b, tmplInput))
 	}
 
 	orPanic(os.WriteFile(outputFile, b.Bytes(), 0o666))
