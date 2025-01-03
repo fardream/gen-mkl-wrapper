@@ -4,7 +4,7 @@ go 1.22.6
 
 require (
 	github.com/spf13/cobra v1.8.1
-	modernc.org/cc/v4 v4.24.3
+	modernc.org/cc/v4 v4.24.4
 	mvdan.cc/gofumpt v0.7.0
 )
 
@@ -17,7 +17,7 @@ require (
 	golang.org/x/tools v0.24.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/opt v0.1.4 // indirect
-	modernc.org/sortutil v1.2.0 // indirect
+	modernc.org/sortutil v1.2.1 // indirect
 	modernc.org/strutil v1.2.1 // indirect
 	modernc.org/token v1.1.0 // indirect
 )
