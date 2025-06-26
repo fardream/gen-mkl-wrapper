@@ -1,11 +1,12 @@
 module github.com/fardream/gen-mkl-wrapper
 
-go 1.22.6
+go 1.23.0
+
 toolchain go1.24.1
 
 require (
 	github.com/spf13/cobra v1.9.1
-	modernc.org/cc/v4 v4.26.1
+	modernc.org/cc/v4 v4.26.2
 	mvdan.cc/gofumpt v0.8.0
 )
 
