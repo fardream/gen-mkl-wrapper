@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.1
 
 require (
-	github.com/spf13/cobra v1.10.1
+	github.com/spf13/cobra v1.10.2
 	modernc.org/cc/v4 v4.26.4
 	mvdan.cc/gofumpt v0.9.1
 )
